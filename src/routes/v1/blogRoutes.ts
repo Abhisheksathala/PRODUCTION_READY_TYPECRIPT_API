@@ -25,6 +25,12 @@ blogRoute.post(
   authorize(['admin']),
   upload.single('banner_image'),
   uploadbanner('post'),
+  body('title').trim().notEmpty().withMessage('string should not be empty '),
+  body('content').trim().notEmpty().withMessage('content should not be empty'),
+  body('status')
+    .optional()
+    .isIn(['darft', 'published'])
+    .withMessage('Staus should be draft or published only'),
   validationError,
   create_blog,
 );

@@ -28,7 +28,7 @@ export const create_blog = async (
 
     const newBlog = new blogModel({
       title: title,
-      content: content,
+      content: cleanContent,
       banner: banner,
       status: status,
       author: userId,

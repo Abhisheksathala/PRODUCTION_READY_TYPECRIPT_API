@@ -1,46 +1,76 @@
-import { blogModel } from '@/models/blog';
 import { logger } from '@/utils/winston';
-
+import uploadToCloudinary from '@/libs/uploadToCLoudinary';
+import blogModel from '@/models/blog';
 import type { Request, Response, NextFunction } from 'express';
+import { UploadApiErrorResponse } from 'cloudinary';
 
-// constants
-
-const MAX_FILE_SIZE = 2 * 1024 * 1024; //max 2MB file
+const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB
 
 const uploadbanner = (method: 'post' | 'put') => {
   return async (req: Request, res: Response, next: NextFunction) => {
-    /**
-     * Upload code goes here
-     */
-
     if (method === 'put' && !req.file) {
-      next();
-      return;
+      return next();
     }
+
     if (!req.file) {
-      res.status(400).json({
+      return res.status(400).json({
         code: 'ValidationError',
-        messgae: 'Blog Banner is requried ',
+        message: 'Blog Banner is required',
         success: false,
       });
-      return;
     }
+
     if (req.file.size > MAX_FILE_SIZE) {
-      res.status(413).json({
-        code: 'validationError',
-        message: 'Files Size is too long must be 2mb',
+      return res.status(413).json({
+        code: 'ValidationError',
+        message: 'File size too large. Max allowed size is 2MB',
+        success: false,
+      });
+    }
+
+    try {
+      const { blogId } = req.params;
+
+      const blog = await blogModel
+        .findById(blogId)
+        .select('banner.publicId')
+        .lean()
+        .exec();
+
+      const oldPublicId = blog?.banner?.publicId?.replace('blog-api/', '');
+
+      const data = await uploadToCloudinary(req.file.buffer, oldPublicId);
+
+      if (!data) {
+        logger.error('Cloudinary returned undefined', { blogId });
+        return res.status(500).json({
+          code: 'ServerError',
+          message: 'Failed to upload banner',
+          success: false,
+        });
+      }
+
+      const newBanner = {
+        publicId: data.public_id,
+        url: data.secure_url,
+        width: data.width,
+        height: data.height,
+      };
+
+      logger.info('Blog banner updated successfully', {
+        blogId,
+        banner: newBanner,
       });
 
-      try {
-        const { blogId } = req.params;
-
-        const blog = await blogModel
-          .findById(blogId)
-          .select('banner_publicId')
-          .exec();
-
-        const data = await uploadToCLoudinary();
-      } catch (error) {}
+      req.body.banner = newBanner;
+      next();
+    } catch (error: UploadApiErrorResponse | any) {
+      logger.error('Error uploading blog banner to cloudinary', error);
+      return res.status(error.http_code).json({
+        code: error.http_code < 500 ? 'validationErro' : error.name,
+        message: 'Something went wrong',
+        success: false,
+      });
     }
   };
 };
