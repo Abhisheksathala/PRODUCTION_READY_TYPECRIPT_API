@@ -82,4 +82,22 @@ blogRoute.get(
   Get_blogs_by_slug,
 );
 
+blogRoute.put(
+  '/updateBlog/:blogId',
+  authenticate,
+  authorize(['admin', 'user']),
+  param('blogId').notEmpty().withMessage('blogId is required'),
+  body('title')
+    .optional()
+    .isLength({ max: 180 })
+    .withMessage('title must be less then 180'),
+  body('content').trim().notEmpty().withMessage('content should not be empty'),
+  body('status')
+    .optional()
+    .isIn(['darft', 'published'])
+    .withMessage('Staus should be draft or published only'),
+  validationError,
+  uploadbanner('put'),
+);
+
 export default blogRoute;
