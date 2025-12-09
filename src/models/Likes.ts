@@ -1,4 +1,4 @@
-import mongoose, { Schema } from 'mongoose';
+import mongoose, { model, Schema } from 'mongoose';
 import { Types } from 'mongoose';
 
 interface likes {
@@ -21,3 +21,7 @@ const liksSchema = new Schema<likes>(
   },
   { timestamps: true },
 );
+
+const LikeModel = model<likes>('like', liksSchema);
+
+export default LikeModel;
