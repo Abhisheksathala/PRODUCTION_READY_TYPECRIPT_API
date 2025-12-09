@@ -1,6 +1,7 @@
 import { logger } from '@/utils/winston';
 import userModel from '@/models/user';
 import type { Request, Response } from 'express';
+import blogModel from '@/models/blog';
 
 const DeleteCurrentUser = async (
   req: Request,
@@ -27,6 +28,8 @@ const DeleteCurrentUser = async (
       });
       return;
     }
+
+    await blogModel.deleteMany({ author: userId });
 
     await userModel.deleteOne({ _id: user._id });
     logger.info('A user account has een deleted', {

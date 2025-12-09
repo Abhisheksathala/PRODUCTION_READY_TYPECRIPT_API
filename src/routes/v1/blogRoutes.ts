@@ -15,7 +15,8 @@ import { create_blog } from '@/controllers/v1/blogs/create_blog';
 import GetAllBlogs from '@/controllers/v1/blogs/get_all_blogs';
 import Get_blogs_by_user from '@/controllers/v1/blogs/get_blogs_by_user';
 import Get_blogs_by_slug from '@/controllers/v1/blogs/get_blog_by_slug';
-
+import { update_blog } from '@/controllers/v1/blogs/update_blog';
+import Delete_blogs from '@/controllers/v1/blogs/Delete_blogs';
 // middleware
 import uploadbanner from '@/midleware/uploadBlogBanner';
 
@@ -98,6 +99,16 @@ blogRoute.put(
     .withMessage('Staus should be draft or published only'),
   validationError,
   uploadbanner('put'),
+  update_blog,
+);
+
+blogRoute.delete(
+  '/:blogId',
+  param('blogId').notEmpty().isMongoId().withMessage('blogId is required'),
+  authenticate,
+  authorize(['admin', 'user']),
+  validationError,
+  Delete_blogs,
 );
 
 export default blogRoute;

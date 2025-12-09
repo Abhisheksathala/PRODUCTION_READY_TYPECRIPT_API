@@ -1,22 +1,17 @@
-// types
 import type { Response, Request } from 'express';
 import { Iblog } from '@/models/blog';
-// node modules
 import DOMPurify from 'dompurify';
 import { JSDOM } from 'jsdom';
-// custom modules
 import { logger } from '@/utils/winston';
-
-// models
 import blogModel from '@/models/blog';
 import userModel from '@/models/user';
 
 const window = new JSDOM('').window;
 const purify = DOMPurify(window);
 
-type BlogData = Pick<Iblog, 'title' | 'content' | 'banner' | 'status'>;
+type BlogData = Partial<Pick<Iblog, 'title' | 'content' | 'banner' | 'status'>>;
 
-export const create_blog = async (
+export const update_blog = async (
   req: Request,
   res: Response,
 ): Promise<void> => {
@@ -25,12 +20,31 @@ export const create_blog = async (
     const userId = req.userId;
     const { blogId } = req.params;
 
+    // Validate required parameters
+    if (!userId) {
+      res.status(401).json({
+        code: 'UNAUTHORIZED',
+        message: 'User not authenticated',
+        success: false,
+      });
+      return;
+    }
+
+    if (!blogId) {
+      res.status(400).json({
+        code: 'BAD_REQUEST',
+        message: 'Blog ID is required',
+        success: false,
+      });
+      return;
+    }
+
     const user = await userModel.findById(userId).select('role').lean().exec();
 
     if (!user) {
       res.status(404).json({
-        code: 'NOT FOUND',
-        message: 'the user does not exist',
+        code: 'NOT_FOUND',
+        message: 'User not found',
         success: false,
       });
       return;
@@ -40,45 +54,57 @@ export const create_blog = async (
 
     if (!blog) {
       res.status(404).json({
-        code: 'BLOG NOT FOUND',
-        message: 'the blog does not exist',
+        code: 'BLOG_NOT_FOUND',
+        message: 'Blog not found',
         success: false,
       });
       return;
     }
 
-    if (blog.author !== userId && userId !== blog.author) {
+    if (blog.author.toString() !== userId.toString()) {
       res.status(403).json({
-        code: 'AUTHORIZATIONERROR',
-        message: 'ACCESS DENIED BECZ UR NOT THE AUTHOR',
+        code: 'FORBIDDEN',
+        message: 'Access denied. You are not the author of this blog',
+        success: false,
       });
-      logger.warn('a user tried to update a blog without auth', {
-        blog,
+      logger.warn('User tried to update a blog without authorization', {
+        blogId,
         userId,
       });
+      return;
     }
+
     if (title) blog.title = title;
     if (content) {
-      const cleanconetet = purify.sanitize(content);
-      blog.content = cleanconetet;
+      const cleanContent = purify.sanitize(content);
+      blog.content = cleanContent;
     }
     if (banner) blog.banner = banner;
     if (status) blog.status = status;
 
-    await blog.save;
+    // Add updated timestamp
+    // blog.updatedAt = new Date();
+
+    await blog.save();
 
     res.status(200).json({
-      blog: blog,
+      blog: blog.toObject(),
       success: true,
-      message: 'blog Updated success',
+      message: 'Blog updated successfully',
     });
   } catch (error) {
-    res.status(403).json({
-      code: 'serverError',
-      message: 'Internal server Error',
+    logger.error('Error while updating the blog', error);
+
+    const errorMessage =
+      process.env.NODE_ENV === 'development'
+        ? (error as Error).message
+        : 'Internal server error';
+
+    res.status(500).json({
+      code: 'SERVER_ERROR',
+      message: 'Internal server error',
       success: false,
-      error: error,
+      ...(process.env.NODE_ENV === 'development' && { error: errorMessage }),
     });
-    logger.error('error while upadting the blog', error);
   }
 };
