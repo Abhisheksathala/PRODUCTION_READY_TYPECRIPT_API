@@ -1,29 +1,26 @@
-// types
+// imports
 import type { Response, Request } from 'express';
-import blogModel, { Iblog } from '@/models/blog';
+import blogModel from '@/models/blog';
 import userModel from '@/models/user';
-import commentModel, { Icomment } from '@/models/comment';
-// custom modules
+import commentModel from '@/models/comment';
 import { logger } from '@/utils/winston';
 
 const Delete_comment = async (req: Request, res: Response): Promise<void> => {
-  const { blogId } = req.params;
+  const { blogId, commentId } = req.params;
   const userId = req.userId;
-  const { commetId } = req.params;
 
-  if (!blogId || !userId) {
+  if (!blogId || !userId || !commentId) {
     res.status(400).json({
       code: 'BadRequest',
-      message: 'blogId and userId are required',
+      message: 'blogId, userId and commentId are required',
       success: false,
     });
     return;
   }
+
   try {
-    const blog = await blogModel
-      .findById(blogId)
-      .select('_id commentsCounts')
-      .exec();
+    // blog check
+    const blog = await blogModel.findById(blogId).select('_id commentsCounts');
     if (!blog) {
       res.status(404).json({
         code: 'NotFound',
@@ -32,42 +29,71 @@ const Delete_comment = async (req: Request, res: Response): Promise<void> => {
       });
       return;
     }
-    const user = await userModel.findById(userId).select('role').lean().exec();
+
+    // user check
+    const user = await userModel.findById(userId).select('role').lean();
     if (!user) {
       res.status(404).json({
-        code: 'NOT FOUND',
-        message:
-          'THE USER UR SEACRCHN DOS NOT EXIST BRO BE A GOOD BOY AND SEND CORRECT ID"s ',
+        code: 'NotFound',
+        message: 'User not found',
         success: false,
       });
       return;
     }
 
+    // comment check
     const comment = await commentModel
-      .findById(commetId)
-      .select('userId blogId')
-      .exec();
+      .findById(commentId)
+      .select('userId blogId');
 
-    if (blogId.toString() !== comment?.blogId.toString()) {
+    if (!comment) {
+      res.status(404).json({
+        code: 'NotFound',
+        message: 'Comment not found',
+        success: false,
+      });
       return;
     }
-    if (userId.toString() !== comment?.userId.toString()) {
+
+    // validate comment belongs to this blog
+    if (comment.blogId.toString() !== blogId.toString()) {
+      res.status(403).json({
+        code: 'Forbidden',
+        message: 'Comment does not belong to this blog',
+        success: false,
+      });
       return;
     }
 
-    await commentModel.findByIdAndDelete(commetId);
-    blog.commentsCounts--;
-    blog.save();
+    // permissions → owner or admin
+    const isOwner = comment.userId.toString() === userId.toString();
+    const isAdmin = user.role === 'admin';
 
-    logger.info('Blog comment added', { userId, blogId });
+    if (!isOwner && !isAdmin) {
+      res.status(403).json({
+        code: 'Forbidden',
+        message: 'Not allowed to delete this comment',
+        success: false,
+      });
+      return;
+    }
+
+    // delete comment
+    await commentModel.findByIdAndDelete(commentId);
+
+    blog.commentsCounts = Math.max(0, blog.commentsCounts - 1);
+    await blog.save();
+
+    logger.info('Comment deleted', { userId, blogId });
+
     res.status(200).json({
       code: 'Success',
-      message: 'comment added successfully',
+      message: 'Comment deleted successfully',
       success: true,
-      commentsCounts: blog.commentsCounts + 1,
+      commentsCounts: blog.commentsCounts,
     });
   } catch (error) {
-    logger.error('Error commet on blog  blog:', error);
+    logger.error('Error deleting comment:', error);
     res.status(500).json({
       code: 'ServerError',
       message: 'Internal server error',
