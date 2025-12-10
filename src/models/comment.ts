@@ -1,7 +1,7 @@
 import { model, Schema } from 'mongoose';
 import { Types } from 'mongoose';
 
-interface Icomment {
+export interface Icomment {
   blogId: Types.ObjectId;
   userId: Types.ObjectId;
   content: string;
