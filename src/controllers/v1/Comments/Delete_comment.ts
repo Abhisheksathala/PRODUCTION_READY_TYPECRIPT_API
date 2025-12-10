@@ -103,3 +103,12 @@ const Delete_comment = async (req: Request, res: Response): Promise<void> => {
 };
 
 export default Delete_comment;
+
+/**
+ *
+ *
+ * completed the project which is production redy useing typescript i will win
+ *
+ *
+ *
+ */
