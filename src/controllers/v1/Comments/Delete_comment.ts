@@ -6,12 +6,11 @@ import commentModel, { Icomment } from '@/models/comment';
 // custom modules
 import { logger } from '@/utils/winston';
 
-type commentData = Pick<Icomment, 'content'>;
-
 const Delete_comment = async (req: Request, res: Response): Promise<void> => {
   const { blogId } = req.params;
   const userId = req.userId;
-  const { content } = req.body as commentData;
+  const { commetId } = req.params;
+
   if (!blogId || !userId) {
     res.status(400).json({
       code: 'BadRequest',
@@ -43,6 +42,22 @@ const Delete_comment = async (req: Request, res: Response): Promise<void> => {
       });
       return;
     }
+
+    const comment = await commentModel
+      .findById(commetId)
+      .select('userId blogId')
+      .exec();
+
+    if (blogId.toString() !== comment?.blogId.toString()) {
+      return;
+    }
+    if (userId.toString() !== comment?.userId.toString()) {
+      return;
+    }
+
+    await commentModel.findByIdAndDelete(commetId);
+    blog.commentsCounts--;
+    blog.save();
 
     logger.info('Blog comment added', { userId, blogId });
     res.status(200).json({
